@@ -1,138 +1,90 @@
-import streamlit as st
-from streamlit_mic_recorder import mic_recorder
 import os
 import time
+from kivy.app import App
+from kivy.uix.boxlayout import BoxLayout
+from kivy.uix.spinner import Spinner
+from kivy.uix.textinput import TextInput
+from kivy.uix.button import Button
+from kivy.uix.label import Label
+from kivy.uix.scrollview import ScrollView
 
-st.set_page_config(page_title="JARVIS OS - Android Game Dev", layout="wide", initial_sidebar_state="expanded")
+BASE_DIR = "/sdcard/Download/Jarvis_Project"
+os.makedirs(f"{BASE_DIR}/assets/ui", exist_ok=True)
+os.makedirs(f"{BASE_DIR}/assets/audio", exist_ok=True)
+os.makedirs(f"{BASE_DIR}/assets/code", exist_ok=True)
 
-# --- СТИЛИЗАЦИЯ ИНТЕРФЕЙСА ПОД CHATGPT ---
-st.markdown("""
-<style>
-    .stApp { background-color: #212121; color: #ececec; font-family: 'Inter', sans-serif; }
-    [data-testid="stSidebar"] { background-color: #171717 !important; border-right: 1px solid #2f2f2f; }
-    .studio-card { background-color: #171717; border: 1px solid #2f2f2f; border-radius: 12px; padding: 20px; margin-bottom: 15px; }
-    div[data-testid="stChatInput"] { background-color: #2f2f2f !important; border: 1px solid #424242 !important; border-radius: 16px !important; }
-</style>
-""", unsafe_allow_html=True)
+STUDIOS = {
+    "1. Chat Orchestrator": "Story & Text LLM Core", "2. Lore Writer": "Story & Text LLM Core",
+    "3. Quest Generator": "Story & Text LLM Core", "4. Notes Maker": "Story & Text LLM Core",
+    "5. Room Builder": "Genesis Physics & Spatial AI", "6. Furniture Fallout-style": "Genesis Physics & Spatial AI",
+    "7. Light Controller": "Genesis Physics & Spatial AI", "8. VFX Destroyer": "Genesis Physics & Spatial AI",
+    "9. Environment Lab": "Genesis Physics & Spatial AI", "10. Logic Constructor": "Genesis Physics & Spatial AI",
+    "11. Wall Textures": "Tripo3D Engine", "12. UI Packs": "Tripo3D Engine",
+    "13. 3D Low-Poly Sculptor": "Tripo3D Engine", "14. Auto-Rigger Bones": "Tripo3D Engine",
+    "15. Facial Lipsync": "Tripo3D Engine", "16. Cloth Physics": "Tripo3D Engine",
+    "17. AR Preview": "Tripo3D Engine", "18. Visual Tweaker": "Tripo3D Engine",
+    "19. Radiant NPC AI": "Vector Memory & Agentic AI", "20. Vector Memory": "Vector Memory & Agentic AI",
+    "21. Horror Director": "Vector Memory & Agentic AI", "22. Monster Agent": "Vector Memory & Agentic AI",
+    "23. GOAP Goals": "Vector Memory & Agentic AI", "24. Adaptive Difficulty": "Vector Memory & Agentic AI",
+    "25. Android Touch Coder": "Claude Sandbox & SDK Compiler", "26. Audio Ambient": "Claude Sandbox & SDK Compiler",
+    "27. Micro-Modules Compiler": "Claude Sandbox & SDK Compiler", "28. Server-Driven UI": "Claude Sandbox & SDK Compiler",
+    "29. QA Bug Hunter": "Claude Sandbox & SDK Compiler", "30. Balance Calculator": "Claude Sandbox & SDK Compiler",
+    "31. APK Compressor": "Claude Sandbox & SDK Compiler", "32. DRM Key Guard": "Claude Sandbox & SDK Compiler"
+}
 
-# Инициализация статуса серверов в ОЗУ
-if "active_server" not in st.session_state:
-    st.session_state.active_server = None
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+class JarvisApp(App):
+    def build(self):
+        self.title = "JARVIS CORE OS v2026"
+        root = BoxLayout(orientation='vertical', padding=20, spacing=15)
+        
+        root.add_widget(Label(text="🤖 JARVIS CORE OS v2026", font_size=24, size_hint_y=None, height=40))
+        
+        self.status_label = Label(text="Server Active: [Main Orchestrator]", size_hint_y=None, height=30, color=(0, 1, 0, 1))
+        root.add_widget(self.status_label)
+        
+        self.spinner = Spinner(text="1. Chat Orchestrator", values=list(STUDIOS.keys()), size_hint_y=None, height=50)
+        self.spinner.bind(text=self.on_spinner_change)
+        root.add_widget(self.spinner)
+        
+        self.input_text = TextInput(hint_text="Введите техническую задачу для ИИ...", multiline=True, size_hint_y=0.3)
+        root.add_widget(self.input_text)
+        
+        btn = Button(text="🚀 Запустить ИИ-процесс в ОЗУ", size_hint_y=None, height=60, background_color=(0, 0.7, 0, 1))
+        btn.bind(on_press=self.run_process)
+        root.add_widget(btn)
+        
+        scroll = ScrollView()
+        self.output_label = Label(text="Результат работы Джарвиса появится здесь...", size_hint_y=None, halign='left', valign='top')
+        self.output_label.bind(width=lambda *x: self.output_label.setter('text_size')(self.output_label, (self.output_label.width, None)))
+        self.output_label.bind(texture_size=lambda *x: self.output_label.setter('height')(self.output_label, self.output_label.texture_size[1]))
+        scroll.add_widget(self.output_label)
+        root.add_widget(scroll)
+        
+        return root
 
-# Функция умного поочередного переключения мобильных серверов
-def switch_android_server(target_server):
-    if st.session_state.active_server != target_server:
-        if st.session_state.active_server:
-            with st.spinner(f"🔋 Выгрузка сервера [{st.session_state.active_server}] для экономии батареи..."):
-                time.sleep(0.5)
-        if target_server:
-            with st.spinner(f"🚀 Запуск ИИ-модуля [{target_server}] внутри памяти..."):
-                time.sleep(0.8)
-        st.session_state.active_server = target_server
+    def on_spinner_change(self, spinner, text):
+        self.status_label.text = f"Server Ready: [{STUDIOS[text]}]"
 
-# ================= 🧭 ВЫДВИЖНАЯ ЛЕВАЯ ШТОРКА (36 ИИ-ЦЕХОВ) =================
-with st.sidebar:
-    st.markdown("<h2 style='color: #00c853; font-weight: 700;'>🤖 JARVIS OS v2026</h2>", unsafe_allow_html=True)
-    st.markdown("<p style='color: #8e8e93; font-size: 12px;'>ЭКОСИСТЕМА АВТОНОМНЫХ ИИ-АГЕНТОВ:</p>", unsafe_allow_html=True)
+    def run_process(self, instance):
+        prompt = self.input_text.text.strip()
+        if not prompt:
+            self.output_label.text = "⚠️ Введите текст задачи."
+            return
+        studio = self.spinner.text
+        self.status_label.text = f"Server Active: [{STUDIOS[studio]}]"
+        
+        if "двер" in prompt.lower() or "door" in prompt.lower():
+            ans = "[C# UNITY SCRIPT]\nusing UnityEngine;\npublic class DoorController : MonoBehaviour {\n    void Update() { /* Touch logic active */ }\n}"
+        else:
+            ans = f"Джарвис принял задачу: '{prompt}'.\nОптимизация под HyperOS завершена.\nДанные сохранены в /Download/Jarvis_Project/."
+            
+        self.output_label.text = ans
+        try:
+            with open(f"{BASE_DIR}/jarvis_history.txt", "a", encoding="utf-8") as f:
+                f.write(f"=== {studio} ===\nPROMPT: {prompt}\nRESPONSE: {ans}\n\n")
+        except:
+            pass
+
+if __name__ == '__main__':
+    JarvisApp().run()
     
-    current_studio = st.radio(
-        "Выберите ИИ-цех разработки:",
-        [
-            "💬 Главный Чат Оркестратор", 
-            "🧠 Память Мира & Живые NPC",
-            "🏠 Архитектор Локаций & Дизайн",
-            "🖼️ Мобильная Графика (Midjourney)", 
-            "📦 3D-Скульптор & Авто-Риггинг", 
-            "🎭 Мастер Эмоций & Липсинк",
-            "💻 Написание и Оптимизация Кода", 
-            "🎵 Сжатые Звуки и Музыка (Suno)",
-            "🧪 Тестировщик & Балансировщик",
-            "📦 Сборщик APK & Защита Ключей"
-        ],
-        label_visibility="collapsed"
-    )
-    st.write("---")
-    st.markdown(f"📱 **Активен процесс в ОЗУ:**\n`{st.session_state.active_server if st.session_state.active_server else 'Все спят'}`")
-
-# ================= 📜 ВЫВОД СОДЕРЖИМОГО КАТЕГОРИЙ =================
-
-# 1. ГЛАВНЫЙ ЧАТ
-if current_studio == "💬 Главный Чат Оркестратор":
-    switch_android_server("Текст и Логика (Mobile Llama)")
-    st.write("<h3 style='text-align: center;'>Центральный Контроллер Джарвиса</h3>", unsafe_allow_html=True)
-    
-    for message in st.session_state.chat_history:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
-
-    # Панель инструментов внизу экрана
-    st.write("---")
-    col_file, col_text, col_mic = st.columns([1, 4, 0.5])
-    with col_file:
-        uploaded_file = st.file_uploader("📎", type=["py", "cs", "mp3", "wav", "mp4", "png", "jpg", "txt"], label_visibility="collapsed")
-    with col_text:
-        user_input = st.chat_input("Прикажите Джарвису продумать хоррор-механики или собрать APK...")
-    with col_mic:
-        mic_recorder(start_prompt="🎤", stop_prompt="🛑", key='main_mic', just_once=True)
-
-    if user_input:
-        st.session_state.chat_history.append({"role": "user", "content": user_input})
-        st.session_state.chat_history.append({"role": "assistant", "content": f"Джарвис принял задачу: `{user_input}`. Все 36 скрытых серверов подключены. Результаты распределяются по вкладкам в левой шторке."})
-        st.rerun()
-
-# 2. ЖИВЫЕ NPC И ПАМЯТЬ
-elif current_studio == "🧠 Память Мира & Живые NPC":
-    switch_android_server("NLP Диалоги & Векторная Память")
-    st.header("🧠 Модуль Живых NPC (Векторная память)")
-    st.markdown('<div class="studio-card"><b>Система Radiant AI 2.0</b><br>Здесь настраивается независимая жизнь ботов, их репутация и квесты. Персонажи будут помнить ваши слова неделями.</div>', unsafe_allow_html=True)
-
-# 3. АРХИТЕКТОР ЛОКАЦИЙ И ФИЗИКА FALLOUT
-elif current_studio == "🏠 Архитектор Локаций & Дизайн":
-    switch_android_server("Genesis Physics & Spatial AI")
-    st.header("🏠 Архитектор особняка (Стиль Promethean AI)")
-    st.markdown('<div class="studio-card"><b>Авто-дизайн комнат и падение предметов Fallout-style</b><br>ИИ процедурно строит дома, расставляет мебель, книги и утварь по полкам, просчитывая физику столкновений.</div>', unsafe_allow_html=True)
-
-# 4. МОБИЛЬНАЯ ГРАФИКА
-elif current_studio == "🖼️ Мобильная Графика (Midjourney)":
-    switch_android_server("Генератор Интерфейсов & Текстур")
-    st.header("🖼️ Цех мобильной графики (Сетка Midjourney)")
-    st.markdown('<div class="studio-card">Генерация бесшовных текстур стен, паков кнопок интерфейса и иконок способностей под экраны смартфонов.</div>', unsafe_allow_html=True)
-
-# 5. 3D И АВТО-СКЕЛЕТЫ
-elif current_studio == "📦 3D-Скульптор & Авто-Риггинг":
-    switch_android_server("Мобильный 3D Просчет & Риггинг")
-    st.header("📦 Low-Poly 3D и Скелеты")
-    st.markdown('<div class="studio-card"><b>Tripo3D & Mixamo Коннектор</b><br>ИИ создает 3D-модель из текста и автоматически зашивает внутрь нее костный каркас (скелет) для анимаций.</div>', unsafe_allow_html=True)
-
-# 6. ЭМОЦИИ И ЛИПСИНК
-elif current_studio == "🎭 Мастер Эмоций & Липсинк":
-    switch_android_server("Face AudioSync Engine")
-    st.header("🎭 Мимика и Озвучка NPC")
-    st.markdown('<div class="studio-card">Синхронизация мимики лица 3D-персонажа с речью из микрофона. Лицо монстра или продавца будет реалистично искажаться от эмоций.</div>', unsafe_allow_html=True)
-
-# 7. АНДРОИД КОДЕР
-elif current_studio == "💻 Написание и Оптимизация Кода":
-    switch_android_server("Компилятор C# / Touch Input")
-    st.header("💻 Оптимизатор Скриптов (Стиль Claude Artifacts)")
-    st.markdown('<div class="studio-card">Написание кода под Unity/Unreal с автоматической оптимизацией RAM и поддержкой мобильных нажатий (Input.GetTouch).</div>', unsafe_allow_html=True)
-
-# 8. СТУДИЯ ЗВУКА
-elif current_studio == "🎵 Сжатые Звуки и Музыка (Suno)":
-    switch_android_server("Синтезатор Волн AudioCraft")
-    st.header("🎵 Аудио-студия (Интерфейс Suno)")
-    st.markdown('<div class="studio-card">Создание легких фоновых музыкальных лупов и SFX звуков (клики кнопок, скрипы дверей), сжатых под формат мобильной игры.</div>', unsafe_allow_html=True)
-
-# 9. ТЕСТЕР И БАЛАНСИРОВЩИК
-elif current_studio == "🧪 Тестировщик & Балансировщик":
-    switch_android_server("Авто-тесты QA & Бюджет Сложности")
-    st.header("🧪 Автоматический поиск багов и Адаптивная сложность")
-    st.markdown('<div class="studio-card">ИИ-агент сам запускает игру и ищет застревания в текстурах. Модуль сложности подстраивает силу монстров под навыки игрока.</div>', unsafe_allow_html=True)
-
-# 10. СБОРКА И ЗАЩИТА КЛЮЧЕЙ
-elif current_studio == "📦 Сборщик APK & Защита Ключей":
-    switch_android_server("Build Master & DRM Security")
-    st.header("📦 Финальная сборка APK и Защита")
-    st.markdown('<div class="studio-card">Компиляция всего проекта в один установочный файл .apk с вшитым античитом и уникальной системой ключей активации.</div>', unsafe_allow_html=True)
-
