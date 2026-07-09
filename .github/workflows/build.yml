@@ -22,14 +22,6 @@ jobs:
           pip install --upgrade pip
           pip install buildozer cython
 
-      - name: Initialize Buildozer
-        run: |
-          buildozer init
-          sed -i 's/title = My Application/title = JARVIS OS/g' buildozer.spec
-          sed -i 's/package.name = myapp/package.name = jarvisos/g' buildozer.spec
-          sed -i 's/package.domain = org.test/package.domain = com.gamedev/g' buildozer.spec
-          sed -i 's/#android.permissions = MONGODB/android.permissions = INTERNET, ACCESS_NETWORK_STATE, WRITE_EXTERNAL_STORAGE/g' buildozer.spec
-
       - name: Build with Buildozer
         run: yes | buildozer android debug
 
@@ -38,3 +30,4 @@ jobs:
         with:
           name: jarvis-os-apk
           path: bin/*.apk
+          
