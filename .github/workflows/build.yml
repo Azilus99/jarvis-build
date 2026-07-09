@@ -1,0 +1,40 @@
+name: Build APK
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git zip unzip openjdk-17-jdk autoconf libtool pkg-config zlib1g-dev libncurses5-dev libbz2-dev libreadline-dev libssl-dev libffi-dev
+          pip install --upgrade pip
+          pip install buildozer cython
+
+      - name: Initialize Buildozer
+        run: |
+          buildozer init
+          sed -i 's/title = My Application/title = JARVIS OS/g' buildozer.spec
+          sed -i 's/package.name = myapp/package.name = jarvisos/g' buildozer.spec
+          sed -i 's/package.domain = org.test/package.domain = com.gamedev/g' buildozer.spec
+          sed -i 's/#android.permissions = MONGODB/android.permissions = INTERNET, ACCESS_NETWORK_STATE/g' buildozer.spec
+
+      - name: Build with Buildozer
+        run: yes | buildozer android debug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: jarvis-os-apk
+          path: bin/*.apk
